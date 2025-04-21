@@ -1,14 +1,12 @@
-/*! @file main.c
- *  @brief Main driver.
- * The main driver function that calls the initialization, solving, and cleaning up functions.
- *  @author Debojyoti Ghosh
-*/
-
 /*! @mainpage
 
   @author Debojyoti Ghosh [\b Email: (first name) (dot) (last name) (at) gmail (dot) com, \b Website: http://debog.github.io/]
   @author John Loffeld
   @author Youngdae Kim
+
+  @author OP2 implementation by Charlene Ng Andrew (https://github.com/chikoness)
+
+  *** This file is part of the OP2 distribution. ***
 
   HyPar: Hyperbolic-Parabolic (with Source) Partial Differential Equations Solver
   -------------------------------------------------------------------------------
@@ -166,6 +164,8 @@
 #include <mpivars_cpp.h>
 #include <simulation_library.h>
 
+#include "op_seq.h"
+
 static const char help[] = "HyPar - A finite-difference algorithm for solving hyperbolic-parabolic PDEs";
 
 #ifdef with_python
@@ -177,35 +177,37 @@ static void initializePythonPlotting(int);
  * \brief Main driver
  *
  * The main driver function that calls the initialization, solving, and cleaning up functions.
-*/
+ */
 int main(int argc, char **argv)
 {
-  int               ierr = 0, d, n;
-  struct timeval    main_start, solve_start;
-  struct timeval    main_end  , solve_end  ;
+  int ierr = 0, d, n;
+  struct timeval main_start, solve_start;
+  struct timeval main_end, solve_end;
 #ifdef with_petsc
-  PetscBool         use_petscts;
+  PetscBool use_petscts;
 #endif
-  int               use_petsc = 0;
+  int use_petsc = 0;
 
 #ifdef serial
   int world = 0;
-  int rank  = 0;
+  int rank = 0;
   int nproc = 1;
   printf("HyPar - Serial Version\n");
 #else
   MPI_Comm world;
   int rank, nproc;
-  MPI_Init(&argc,&argv);
+  MPI_Init(&argc, &argv);
   MPI_Comm_dup(MPI_COMM_WORLD, &world);
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank );
-  MPI_Comm_size(MPI_COMM_WORLD,&nproc);
-  if (!rank) printf("HyPar - Parallel (MPI) version with %d processes\n",nproc);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+  if (!rank)
+    printf("HyPar - Parallel (MPI) version with %d processes\n", nproc);
 #endif
 
 #ifdef with_petsc
-  PetscInitialize(&argc,&argv,(char*)0,help);
-  if (!rank) printf("Compiled with PETSc time integration.\n");
+  PetscInitialize(&argc, &argv, (char *)0, help);
+  if (!rank)
+    printf("Compiled with PETSc time integration.\n");
 #endif
 
 #ifdef with_python
@@ -213,12 +215,13 @@ int main(int argc, char **argv)
   initializePythonPlotting(rank);
 #endif
 
-  gettimeofday(&main_start,NULL);
+  gettimeofday(&main_start, NULL);
 
   int sim_type = -1;
   Simulation *sim = NULL;
 
-  if (!rank) {
+  if (!rank)
+  {
 
     std::string ensemble_sim_fname(_ENSEMBLE_SIM_INP_FNAME_);
     std::string sparsegrids_sim_fname(_SPARSEGRIDS_SIM_INP_FNAME_);
@@ -226,66 +229,80 @@ int main(int argc, char **argv)
     FILE *f_ensemble_sim = fopen(ensemble_sim_fname.c_str(), "r");
     FILE *f_sparsegrids_sim = fopen(sparsegrids_sim_fname.c_str(), "r");
 
-    if (f_ensemble_sim && f_sparsegrids_sim) {
+    if (f_ensemble_sim && f_sparsegrids_sim)
+    {
 
-      fprintf(stderr,"Error: Cannot have both %s and %s input files.\n",
+      fprintf(stderr, "Error: Cannot have both %s and %s input files.\n",
               _ENSEMBLE_SIM_INP_FNAME_, _SPARSEGRIDS_SIM_INP_FNAME_);
       fprintf(stderr, "Remove one or both of them depending on the kind of simulation you want to run.\n");
       fclose(f_ensemble_sim);
       fclose(f_sparsegrids_sim);
-
-    } else if (f_ensemble_sim) {
+    }
+    else if (f_ensemble_sim)
+    {
 
       sim_type = _SIM_TYPE_ENSEMBLE_;
       fclose(f_ensemble_sim);
-
-    } else if (f_sparsegrids_sim) {
+    }
+    else if (f_sparsegrids_sim)
+    {
 
       sim_type = _SIM_TYPE_SPARSE_GRIDS_;
       fclose(f_sparsegrids_sim);
-
-    } else {
+    }
+    else
+    {
 
       sim_type = _SIM_TYPE_SINGLE_;
-
     }
-
   }
 
 #ifndef serial
   MPI_Bcast(&sim_type, 1, MPI_INT, 0, MPI_COMM_WORLD);
 #endif
 
-  if (sim_type == _SIM_TYPE_SINGLE_) {
+  if (sim_type == _SIM_TYPE_SINGLE_)
+  {
     sim = new SingleSimulation;
-  } else if (sim_type == _SIM_TYPE_ENSEMBLE_) {
-    if (!rank) printf("-- Ensemble Simulation --\n");
+  }
+  else if (sim_type == _SIM_TYPE_ENSEMBLE_)
+  {
+    if (!rank)
+      printf("-- Ensemble Simulation --\n");
     sim = new EnsembleSimulation;
-  } else if (sim_type == _SIM_TYPE_SPARSE_GRIDS_) {
-    if (!rank) printf("-- Sparse Grids Simulation --\n");
+  }
+  else if (sim_type == _SIM_TYPE_SPARSE_GRIDS_)
+  {
+    if (!rank)
+      printf("-- Sparse Grids Simulation --\n");
     sim = new SparseGridsSimulation;
-  } else {
+  }
+  else
+  {
     fprintf(stderr, "ERROR: invalid sim_type (%d) on rank %d.\n",
             sim_type, rank);
   }
 
-  if (sim == NULL) {
+  if (sim == NULL)
+  {
     fprintf(stderr, "ERROR: unable to create sim on rank %d.\n",
-            rank );
+            rank);
     return 1;
   }
 
   /* Allocate simulation objects */
   ierr = sim->define(rank, nproc);
-  if (!sim->isDefined()) {
+  if (!sim->isDefined())
+  {
     printf("Error: Simulation::define() failed on rank %d\n",
            rank);
     return 1;
   }
-  if (ierr) {
+  if (ierr)
+  {
     printf("Error: Simulation::define() returned with status %d on process %d.\n",
-            ierr, rank);
-    return(ierr);
+           ierr, rank);
+    return (ierr);
   }
 
 #ifndef serial
@@ -294,75 +311,86 @@ int main(int argc, char **argv)
 
 #ifdef with_petsc
   use_petscts = PETSC_FALSE; /* default value */
-  ierr = PetscOptionsGetBool( nullptr,nullptr,
-                              "-use-petscts",
-                              &use_petscts,
-                              nullptr); CHKERRQ(ierr);
-  if (use_petscts == PETSC_TRUE) use_petsc = 1;
+  ierr = PetscOptionsGetBool(nullptr, nullptr,
+                             "-use-petscts",
+                             &use_petscts,
+                             nullptr);
+  CHKERRQ(ierr);
+  if (use_petscts == PETSC_TRUE)
+    use_petsc = 1;
   sim->usePetscTS(use_petscts);
 #endif
 
   /* Read Inputs */
   ierr = sim->ReadInputs();
-  if (ierr) {
-    printf("Error: Simulation::ReadInputs() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::ReadInputs() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* Initialize and allocate arrays */
   ierr = sim->Initialize();
-  if (ierr) {
-    printf("Error: Simulation::Initialize() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::Initialize() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* read and set grid & initial solution */
   ierr = sim->InitialSolution();
-  if (ierr) {
-    printf("Error: Simulation::InitialSolution() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::InitialSolution() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* Initialize domain boundaries */
   ierr = sim->InitializeBoundaries();
-  if (ierr) {
-    printf("Error: Simulation::InitializeBoundaries() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::InitializeBoundaries() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* Initialize immersed boundaries */
   ierr = sim->InitializeImmersedBoundaries();
-  if (ierr) {
-    printf("Error: Simulation::InitializeImmersedBoundaries() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::InitializeImmersedBoundaries() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* Initialize solvers */
   ierr = sim->InitializeSolvers();
-  if (ierr) {
-    printf("Error: Simulation::InitializeSolvers() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::InitializeSolvers() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* Initialize physics */
   ierr = sim->InitializePhysics();
-  if (ierr) {
-    printf("Error: Simulation::InitializePhysics() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::InitializePhysics() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* Initialize physics data */
   ierr = sim->InitializePhysicsData();
-  if (ierr) {
-    printf("Error: Simulation::InitializePhysicsData() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::InitializePhysicsData() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* Wrap up initializations */
   ierr = sim->InitializationWrapup();
-  if (ierr) {
-    printf("Error: Simulation::InitializationWrapup() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::InitializationWrapup() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 
   /* Initializations complete */
@@ -371,54 +399,63 @@ int main(int argc, char **argv)
 #ifndef serial
   MPI_Barrier(MPI_COMM_WORLD);
 #endif
-  gettimeofday(&solve_start,NULL);
+  gettimeofday(&solve_start, NULL);
 #ifdef with_petsc
-  if (use_petsc == 1) {
+  if (use_petsc == 1)
+  {
     /* Use PETSc time-integration */
     ierr = sim->SolvePETSc();
-    if (ierr) {
-      printf("Error: Simulation::SolvePETSc() returned with status %d on process %d.\n",ierr,rank);
-      return(ierr);
+    if (ierr)
+    {
+      printf("Error: Simulation::SolvePETSc() returned with status %d on process %d.\n", ierr, rank);
+      return (ierr);
     }
-  } else {
+  }
+  else
+  {
     /* Use native time-integration */
     ierr = sim->Solve();
-    if (ierr) {
-      printf("Error: Simulation::Solve() returned with status %d on process %d.\n",ierr,rank);
-      return(ierr);
+    if (ierr)
+    {
+      printf("Error: Simulation::Solve() returned with status %d on process %d.\n", ierr, rank);
+      return (ierr);
     }
   }
 #else
   /* Use native time-integration */
   ierr = sim->Solve();
-  if (ierr) {
-    printf("Error: Simulation::Solve() returned with status %d on process %d.\n",ierr,rank);
-    return(ierr);
+  if (ierr)
+  {
+    printf("Error: Simulation::Solve() returned with status %d on process %d.\n", ierr, rank);
+    return (ierr);
   }
 #endif
-  gettimeofday(&solve_end,NULL);
+  gettimeofday(&solve_end, NULL);
 #ifndef serial
   MPI_Barrier(MPI_COMM_WORLD);
 #endif
-  gettimeofday(&main_end,NULL);
+  gettimeofday(&main_end, NULL);
 
   /* calculate solver and total runtimes */
   long long walltime;
-  walltime = (  (main_end.tv_sec * 1000000   + main_end.tv_usec  )
-              - (main_start.tv_sec * 1000000 + main_start.tv_usec));
-  double main_runtime = (double) walltime / 1000000.0;
-  ierr = MPIMax_double(&main_runtime,&main_runtime,1,&world); if(ierr) return(ierr);
-  walltime = (  (solve_end.tv_sec * 1000000   + solve_end.tv_usec  )
-              - (solve_start.tv_sec * 1000000 + solve_start.tv_usec));
-  double solver_runtime = (double) walltime / 1000000.0;
-  ierr = MPIMax_double(&solver_runtime,&solver_runtime,1,&world); if(ierr) return(ierr);
+  walltime = ((main_end.tv_sec * 1000000 + main_end.tv_usec) - (main_start.tv_sec * 1000000 + main_start.tv_usec));
+  double main_runtime = (double)walltime / 1000000.0;
+  ierr = MPIMax_double(&main_runtime, &main_runtime, 1, &world);
+  if (ierr)
+    return (ierr);
+  walltime = ((solve_end.tv_sec * 1000000 + solve_end.tv_usec) - (solve_start.tv_sec * 1000000 + solve_start.tv_usec));
+  double solver_runtime = (double)walltime / 1000000.0;
+  ierr = MPIMax_double(&solver_runtime, &solver_runtime, 1, &world);
+  if (ierr)
+    return (ierr);
 
   /* Write errors and other data */
   sim->WriteErrors(solver_runtime, main_runtime);
 
   /* Cleaning up */
   delete sim;
-  if (!rank) printf("Finished.\n");
+  if (!rank)
+    printf("Finished.\n");
 
 #ifdef with_python
   Py_Finalize();
@@ -433,7 +470,7 @@ int main(int argc, char **argv)
   MPI_Finalize();
 #endif
 
-  return(0);
+  return (0);
 }
 
 #ifdef with_python
@@ -441,7 +478,8 @@ int main(int argc, char **argv)
 void initializePython(int a_rank /*!< MPI rank */)
 {
   Py_Initialize();
-  if (!a_rank) printf("Initialized Python.\n");
+  if (!a_rank)
+    printf("Initialized Python.\n");
   PyRun_SimpleString("import os");
   PyRun_SimpleString("hypar_dir = os.environ.get('HYPAR_DIR')");
 #ifndef serial
@@ -457,9 +495,9 @@ void initializePythonPlotting(int a_rank /*!< MPI rank */)
   PyRun_SimpleString("hypar_dir_plt_py = hypar_dir + '/src/PlottingFunctions'");
   PyRun_SimpleString("import sys");
   PyRun_SimpleString("sys.path.append(hypar_dir_plt_py)");
-  if (!a_rank) {
-    PyRun_SimpleString
-      ("print('Added plotting script directory (%s) to Python path.' % hypar_dir_plt_py)");
+  if (!a_rank)
+  {
+    PyRun_SimpleString("print('Added plotting script directory (%s) to Python path.' % hypar_dir_plt_py)");
   }
 #ifndef serial
   MPI_Barrier(MPI_COMM_WORLD);
