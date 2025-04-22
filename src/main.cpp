@@ -153,17 +153,18 @@
 #include <petscinterface.h>
 #endif
 
-#ifdef with_python
-#include <Python.h>
-#ifdef with_python_numpy
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#include <numpy/arrayobject.h>
-#endif
-#endif
+// #ifdef with_python
+// #include <Python.h>
+// #ifdef with_python_numpy
+// #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+// #include <numpy/arrayobject.h>
+// #endif
+// #endif
 
 #include <mpivars_cpp.h>
 #include <simulation_library.h>
 
+// Declare OP2
 #include "op_seq.h"
 
 static const char help[] = "HyPar - A finite-difference algorithm for solving hyperbolic-parabolic PDEs";
@@ -200,6 +201,9 @@ int main(int argc, char **argv)
   MPI_Comm_dup(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+
+  op_init(argc, argv, 1); // initialize OP2
+
   if (!rank)
     printf("HyPar - Parallel (MPI) version with %d processes\n", nproc);
 #endif
@@ -214,6 +218,8 @@ int main(int argc, char **argv)
   initializePython(rank);
   initializePythonPlotting(rank);
 #endif
+
+  op_printf("Hello from OP2!\n");
 
   gettimeofday(&main_start, NULL);
 
@@ -468,41 +474,43 @@ int main(int argc, char **argv)
 #ifndef serial
   MPI_Comm_free(&world);
   MPI_Finalize();
+
+  op_exit(); // Finalise OP2
 #endif
 
   return (0);
 }
 
-#ifdef with_python
-/*! Initialize Python interpreter */
-void initializePython(int a_rank /*!< MPI rank */)
-{
-  Py_Initialize();
-  if (!a_rank)
-    printf("Initialized Python.\n");
-  PyRun_SimpleString("import os");
-  PyRun_SimpleString("hypar_dir = os.environ.get('HYPAR_DIR')");
-#ifndef serial
-  MPI_Barrier(MPI_COMM_WORLD);
-#endif
-  return;
-}
+// #ifdef with_python
+// /*! Initialize Python interpreter */
+// void initializePython(int a_rank /*!< MPI rank */)
+// {
+//   Py_Initialize();
+//   if (!a_rank)
+//     printf("Initialized Python.\n");
+//   PyRun_SimpleString("import os");
+//   PyRun_SimpleString("hypar_dir = os.environ.get('HYPAR_DIR')");
+// #ifndef serial
+//   MPI_Barrier(MPI_COMM_WORLD);
+// #endif
+//   return;
+// }
 
-/*! Initialize Python plotting stuff */
-void initializePythonPlotting(int a_rank /*!< MPI rank */)
-{
-  /* load plotting tools and scripts */
-  PyRun_SimpleString("hypar_dir_plt_py = hypar_dir + '/src/PlottingFunctions'");
-  PyRun_SimpleString("import sys");
-  PyRun_SimpleString("sys.path.append(hypar_dir_plt_py)");
-  if (!a_rank)
-  {
-    PyRun_SimpleString("print('Added plotting script directory (%s) to Python path.' % hypar_dir_plt_py)");
-  }
-#ifndef serial
-  MPI_Barrier(MPI_COMM_WORLD);
-#endif
-  return;
-}
+// /*! Initialize Python plotting stuff */
+// void initializePythonPlotting(int a_rank /*!< MPI rank */)
+// {
+//   /* load plotting tools and scripts */
+//   PyRun_SimpleString("hypar_dir_plt_py = hypar_dir + '/src/PlottingFunctions'");
+//   PyRun_SimpleString("import sys");
+//   PyRun_SimpleString("sys.path.append(hypar_dir_plt_py)");
+//   if (!a_rank)
+//   {
+//     PyRun_SimpleString("print('Added plotting script directory (%s) to Python path.' % hypar_dir_plt_py)");
+//   }
+// #ifndef serial
+//   MPI_Barrier(MPI_COMM_WORLD);
+// #endif
+//   return;
+// }
 
-#endif
+// #endif

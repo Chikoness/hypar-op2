@@ -1,0 +1,6 @@
+HyPar - Parallel (MPI) version with 1 processes
+Allocated simulation object(s).
+Reading solver inputs from file "solver.inp".
+  No. of dimensions                          : 1
+  No. of variables                           : 1
+  Domain size                                : 
