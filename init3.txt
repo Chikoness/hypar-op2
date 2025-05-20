@@ -1,0 +1,4 @@
+
+ Initializing OP2
+HyPar - Parallel (MPI) version with 1 processes
+Hello from OP2!
